@@ -1,4 +1,3 @@
-// controllers/jobApplication.js
 const JobApplication = require('../models/jobApplication');
 const Job = require('../models/Job');
 const User = require('../models/User');
@@ -7,7 +6,10 @@ const User = require('../models/User');
 exports.applyForJob = async (req, res) => {
   try {
     const { jobId } = req.params;
-    const { userId } = req.body; // Assuming userId comes from the body (you can use req.user.id for authenticated users)
+    const { fullName, email, phoneNumber, location, coverLetter, resume, cv } = req.body;
+
+    // Get the user ID from the authenticated user (assumed to be part of req.user)
+    const userId = req.user.id;
 
     // Check if the job exists
     const job = await Job.findById(jobId);
@@ -21,10 +23,17 @@ exports.applyForJob = async (req, res) => {
     const existingApplication = await JobApplication.findOne({ user: userId, job: jobId });
     if (existingApplication) return res.status(400).json({ msg: 'User has already applied for this job' });
 
-    // Create a new application
+    // Create a new job application
     const newApplication = new JobApplication({
       user: userId,
       job: jobId,
+      fullName,
+      email,
+      phoneNumber,
+      location,
+      coverLetter,
+      resume,
+      cv,
       status: 'Pending' // Default status
     });
 

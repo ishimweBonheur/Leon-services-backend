@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const User = require("../models/jobApplication");
+const User = require("../models/User");
 
 // Middleware to verify JWT and attach user info to req
 exports.authenticate = async (req, res, next) => {

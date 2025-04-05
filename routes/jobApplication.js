@@ -36,6 +36,31 @@ const router = express.Router();
  *             properties:
  *               userId:
  *                 type: string
+ *                 description: The ID of the user applying for the job
+ *               fullName:
+ *                 type: string
+ *                 description: Full name of the applicant
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Email address of the applicant
+ *               phoneNumber:
+ *                 type: string
+ *                 description: Applicant's phone number
+ *               location:
+ *                 type: string
+ *                 description: Location (city, country) of the applicant
+ *               coverLetter:
+ *                 type: string
+ *                 description: A cover letter written by the applicant for the job application
+ *               resume:
+ *                 type: string
+ *                 format: uri
+ *                 description: URL or path to the applicant's resume file
+ *               cv:
+ *                 type: string
+ *                 format: uri
+ *                 description: URL or path to the applicant's CV file (if separate from the resume)
  *     responses:
  *       201:
  *         description: Application submitted successfully
