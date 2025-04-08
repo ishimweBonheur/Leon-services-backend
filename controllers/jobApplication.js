@@ -1,4 +1,4 @@
-const JobApplication = require('../models/JobApplication');
+const JobApplication = require('../models/application');
 
 exports.submitApplication = async (req, res) => {
   try {
