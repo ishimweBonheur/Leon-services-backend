@@ -1,23 +1,111 @@
-// routes/job.js
 const express = require('express');
-const { createJob, getAllJobs, getJobById, updateJob, deleteJob } = require('../controllers/job');
+const router = express.Router();
+const jobController = require('../controllers/job');
 const { authenticate, authorizeRoles } = require('../middlewares/user');
 
-const router = express.Router();
 
 /**
  * @swagger
- * tags:
- *   name: Jobs
- *   description: The job management API
+ * components:
+ *   securitySchemes:
+ *     bearerAuth:
+ *       type: http
+ *       scheme: bearer
+ *       bearerFormat: JWT
+ * 
+ *   schemas:
+ *     Job:
+ *       type: object
+ *       required:
+ *         - title
+ *         - description
+ *         - location
+ *         - company
+ *         - endDate
+ *         - postedBy
+ *       properties:
+ *         title:
+ *           type: string
+ *           example: "Frontend Developer"
+ *         description:
+ *           type: string
+ *           example: "We are looking for a skilled frontend developer..."
+ *         requirements:
+ *           type: array
+ *           items:
+ *             type: string
+ *           example: ["HTML", "CSS", "React"]
+ *         responsibilities:
+ *           type: array
+ *           items:
+ *             type: string
+ *           example: ["Develop UI components", "Collaborate with backend team"]
+ *         endDate:
+ *           type: string
+ *           format: date
+ *           example: "2025-06-01"
+ *         employmentType:
+ *           type: string
+ *           enum: [Full-Time, Part-Time, Internship, Contract]
+ *           example: Full-Time
+ *         salary:
+ *           type: number
+ *           example: 80000
+ *         location:
+ *           type: string
+ *           example: "Kigali, Rwanda"
+ *         remote:
+ *           type: boolean
+ *           example: true
+ *         company:
+ *           type: string
+ *           example: "Tech Solutions Ltd"
+ *         postedBy:
+ *           type: string
+ *           description: "User ID who posted the job"
+ *           example: "644a3fa7bcd35b2d88c3c111"
+ *         applicationDeadline:
+ *           type: string
+ *           format: date
+ *           example: "2025-05-15"
+ *         status:
+ *           type: string
+ *           enum: [Open, Closed]
+ *           example: Open
+ *         requirementsConfig:
+ *           type: object
+ *           properties:
+ *             cv:
+ *               type: boolean
+ *               example: true
+ *             coverLetter:
+ *               type: boolean
+ *               example: false
+ *             portfolio:
+ *               type: boolean
+ *               example: true
+ *             github:
+ *               type: boolean
+ *               example: false
+ *             linkedIn:
+ *               type: boolean
+ *               example: false
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           example: "2025-04-06T08:00:00.000Z"
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           example: "2025-04-06T08:00:00.000Z"
  */
 
 /**
  * @swagger
- * /api/v1/jobs:
+ * /jobs:
  *   post:
- *     summary: Post a new job
- *     tags: [Jobs]
+ *     summary: Create a new job
+ *     tags: [Job]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -25,78 +113,27 @@ const router = express.Router();
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required:
- *               - title
- *               - description
- *               - salary
- *               - company
- *               - location
- *             properties:
- *               title:
- *                 type: string
- *               description:
- *                 type: string
- *               salary:
- *                 type: number
- *               company:
- *                 type: string
- *               location:
- *                 type: string
+ *             $ref: '#/components/schemas/Job'
  *     responses:
  *       201:
- *         description: Job posted successfully
- *       500:
- *         description: Internal server error
+ *         description: Job created successfully
+ *       401:
+ *         description: Unauthorized
  */
-router.post('/', authenticate, authorizeRoles('admin'), createJob); // Admin only
+router.post('/', authenticate, authorizeRoles('admin'), jobController.createJob);
 
 /**
  * @swagger
- * /api/v1/jobs:
- *   get:
- *     summary: Get all jobs
- *     tags: [Jobs]
- *     responses:
- *       200:
- *         description: A list of jobs
- */
-router.get('/', getAllJobs); // Public access
-
-/**
- * @swagger
- * /api/v1/jobs/{id}:
- *   get:
- *     summary: Get a job by ID
- *     tags: [Jobs]
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         description: The ID of the job
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Job information
- *       404:
- *         description: Job not found
- */
-router.get('/:id', getJobById); // Public access
-
-/**
- * @swagger
- * /api/v1/jobs/{id}:
+ * /jobs/{jobId}:
  *   put:
- *     summary: Update a job post
- *     tags: [Jobs]
+ *     summary: Update a job
+ *     tags: [Job]
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - name: id
+ *       - name: jobId
  *         in: path
  *         required: true
- *         description: The ID of the job
  *         schema:
  *           type: string
  *     requestBody:
@@ -104,51 +141,39 @@ router.get('/:id', getJobById); // Public access
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               title:
- *                 type: string
- *               description:
- *                 type: string
- *               salary:
- *                 type: number
- *               company:
- *                 type: string
- *               location:
- *                 type: string
+ *             $ref: '#/components/schemas/Job'
  *     responses:
  *       200:
- *         description: Successfully updated the job post
- *       403:
- *         description: Not authorized to update job
+ *         description: Job updated successfully
  *       404:
  *         description: Job not found
+ *       401:
+ *         description: Unauthorized
  */
-router.put('/:id', authenticate, authorizeRoles('admin'), updateJob); // Admin only
+router.put('/:jobId', authenticate, authorizeRoles('admin'), jobController.updateJob);
 
 /**
  * @swagger
- * /api/v1/jobs/{id}:
+ * /jobs/{jobId}:
  *   delete:
- *     summary: Delete a job post
- *     tags: [Jobs]
+ *     summary: Delete a job
+ *     tags: [Job]
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - name: id
+ *       - name: jobId
  *         in: path
  *         required: true
- *         description: The ID of the job
  *         schema:
  *           type: string
  *     responses:
  *       200:
- *         description: Successfully deleted the job post
- *       403:
- *         description: Not authorized to delete job
+ *         description: Job deleted successfully
  *       404:
  *         description: Job not found
+ *       401:
+ *         description: Unauthorized
  */
-router.delete('/:id', authenticate, authorizeRoles('admin'), deleteJob); // Admin only
-
+router.delete('/:jobId', authenticate, authorizeRoles('admin'), jobController.deleteJob);
+router.get('/', jobController.getJobs);
 module.exports = router;

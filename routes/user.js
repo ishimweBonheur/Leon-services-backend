@@ -1,155 +1,137 @@
 const express = require('express');
-const {
-  getAllUsers,
-  getUserById,
-  updateUser,
-  deleteUser,
-  register,
-  login
-} = require('../controllers/user');
-
 const { authenticate, authorizeRoles } = require('../middlewares/user');
+const pagination = require('../middlewares/pagination');
+const userController = require('../controllers/user');
+const User = require('../models/User');
 
 const router = express.Router();
 
 /**
  * @swagger
- * tags:
- *   name: Users
- *   description: The user management API
+ * components:
+ *   schemas:
+ *     User:
+ *       type: object
+ *       required:
+ *         - firstName
+ *         - lastName
+ *         - username
+ *         - email
+ *         - phone
+ *         - password
+ *       properties:
+ *         firstName:
+ *           type: string
+ *         lastName:
+ *           type: string
+ *         username:
+ *           type: string
+ *         email:
+ *           type: string
+ *           format: email
+ *         phone:
+ *           type: string
+ *         password:
+ *           type: string
+ *           format: password
+ *         role:
+ *           type: string
+ *           enum: ['admin', 'applicant']
  */
 
 /**
  * @swagger
- * /api/v1/users/register:
+ * /api/users:
  *   post:
- *     summary: Register a new user
+ *     summary: Create a new user (Admin only)
+ *     security:
+ *       - BearerAuth: []
  *     tags: [Users]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required:
- *               - fullName
- *               - userName
- *               - phoneNumber
- *               - email
- *               - password
- *             properties:
- *               fullName:
- *                 type: string
- *                 description: The user's full name
- *               userName:
- *                 type: string
- *                 description: The user's username
- *               phoneNumber:
- *                 type: string
- *                 description: The user's phone number
- *               email:
- *                 type: string
- *                 description: The user's email address
- *               password:
- *                 type: string
- *                 description: The user's password
- *               role:
- *                 type: string
- *                 description: The user's role (optional, defaults to 'user')
+ *             $ref: '#/components/schemas/User'
  *     responses:
  *       201:
- *         description: User successfully registered
+ *         description: User created successfully
  *       400:
- *         description: Bad request (e.g., validation error or duplicate email/username/phone)
- *       500:
- *         description: Internal server error
+ *         description: Invalid request data
  */
-router.post('/register', register); // User registration route
+router.post('/', authenticate, authorizeRoles('admin'), userController.createUser);
 
 /**
  * @swagger
- * /api/v1/users/login:
- *   post:
- *     summary: Login a user
- *     tags: [Users]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - password
- *             properties:
- *               email:
- *                 type: string
- *                 description: The user's email address
- *               password:
- *                 type: string
- *                 description: The user's password
- *     responses:
- *       200:
- *         description: Successfully logged in and received a token
- *       400:
- *         description: Invalid credentials
- *       500:
- *         description: Internal server error
- */
-router.post('/login', login); // User login route
-
-/**
- * @swagger
- * /api/v1/users:
+ * /api/users:
  *   get:
  *     summary: Get all users
- *     tags: [Users]
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
+ *     tags: [Users]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Number of users per page
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search term for username, email, first name, or last name
+ *       - in: query
+ *         name: role
+ *         schema:
+ *           type: string
+ *           enum: ['admin', 'applicant']
+ *         description: Filter by user role
  *     responses:
  *       200:
  *         description: A list of users
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 results:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/User'
+ *                 totalDocuments:
+ *                   type: integer
+ *                 totalPages:
+ *                   type: integer
+ *                 currentPage:
+ *                   type: integer
+ *                 nextPage:
+ *                   type: integer
+ *                   nullable: true
+ *                 prevPage:
+ *                   type: integer
+ *                   nullable: true
+ *       400:
+ *         description: Invalid request data
  */
-router.get('/', authenticate ,authorizeRoles('admin'), getAllUsers); // Admin only
+router.get('/', authenticate, authorizeRoles('admin'), pagination(User), userController.getAllUsers);
 
 /**
  * @swagger
- * /api/v1/users/{id}:
- *   get:
- *     summary: Get a user by ID
- *     tags: [Users]
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         description: The ID of the user
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: User information
- *       404:
- *         description: User not found
- */
-router.get('/:id', getUserById); // Any logged-in user
-
-/**
- * @swagger
- * /api/v1/users/{id}:
+ * /api/users/{id}:
  *   put:
- *     summary: Update a user's information
- *     tags: [Users]
+ *     summary: Update a user (Admin, Manager, or Owner)
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
+ *     tags: [Users]
  *     parameters:
- *       - name: id
- *         in: path
+ *       - in: path
+ *         name: id
  *         required: true
- *         description: The ID of the user to update
  *         schema:
  *           type: string
  *     requestBody:
@@ -157,51 +139,109 @@ router.get('/:id', getUserById); // Any logged-in user
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               fullName:
- *                 type: string
- *               userName:
- *                 type: string
- *               phoneNumber:
- *                 type: string
- *               email:
- *                 type: string
- *               role:
- *                 type: string
+ *             $ref: '#/components/schemas/User'
  *     responses:
  *       200:
- *         description: Successfully updated user information
+ *         description: User updated successfully
  *       400:
- *         description: Bad request
- *       404:
- *         description: User not found
+ *         description: Invalid request data
  */
-router.put('/:id', updateUser); // Admin or self (you can check that in controller if needed)
+router.put('/:id', authenticate, authorizeRoles('admin', 'applicant'), userController.updateUser);
+
 
 /**
  * @swagger
- * /api/v1/users/{id}:
+ * /api/users/{id}:
  *   delete:
- *     summary: Delete a user by ID
- *     tags: [Users]
+ *     summary: Deactivate a user (Admin, Manager, or Owner)
+ *     description: Deactivates a user by setting their `is_active` field to `false`. The user is not removed from the system.
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
+ *     tags: [Users]
  *     parameters:
- *       - name: id
- *         in: path
+ *       - in: path
+ *         name: id
  *         required: true
- *         description: The ID of the user to delete
  *         schema:
  *           type: string
+ *         description: The ID of the user to deactivate.
  *     responses:
  *       200:
- *         description: Successfully deleted the user
+ *         description: User deactivated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: User deactivated
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       400:
+ *         description: Invalid request data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: User not found
+ *       401:
+ *         description: Unauthorized (missing or invalid token)
  *       403:
- *         description: Forbidden
- *       404:
- *         description: User not found
+ *         description: Forbidden (user does not have the required role)
  */
-router.delete('/:id', authorizeRoles('admin'), deleteUser); // Admin only
+router.delete('/:id',authenticate, authorizeRoles('admin', 'applicant'),userController.deleteUser);
+
+/**
+ * @swagger
+ * /api/users/activate/{id}:
+ *   put:
+ *     summary: Activate a user (Admin, Manager)
+ *     description: Activates a user by setting their `is_active` field to `true`.
+ *     security:
+ *       - BearerAuth: []
+ *     tags: [Users]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The ID of the user to activate.
+ *     responses:
+ *       200:
+ *         description: User activated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: User activated successfully
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       400:
+ *         description: Invalid request data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: User not found
+ *       401:
+ *         description: Unauthorized (missing or invalid token)
+ *       403:
+ *         description: Forbidden (user does not have the required role)
+ */
+router.put('/activate/:id',authenticate, authorizeRoles('admin'),userController.activeUser);
+
+
+
 
 module.exports = router;
