@@ -221,5 +221,6 @@ router.patch('/:applicationId/status', authenticate, authorizeRoles('admin'), ap
 router.get('/by-job/:jobId', authenticate, applicationController.getApplicationsByJob);
 router.get('/by-user/:userId', authenticate, applicationController.getApplicationsByUser);
 router.get('/by-status/:status', authenticate, authorizeRoles('admin'), applicationController.getApplicationsByStatus);
+router.get('/', authenticate, applicationController.getAllApplications);
 
 module.exports = router;

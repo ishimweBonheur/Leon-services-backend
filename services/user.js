@@ -13,7 +13,6 @@ const updateUser = async (userId, updatedData) => {
 };
 
 
-// this is to inactivate the user instead of deleting him or her 
 const deleteUser = async (userId) => {
   const user = await User.findByIdAndUpdate(
     userId,

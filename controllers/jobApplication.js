@@ -80,3 +80,15 @@ exports.getApplicationsByStatus = async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 };
+
+exports.getAllApplications = async (req, res) => {
+  try {
+    const applications = await JobApplication.find()
+      .populate('user') 
+      .populate('job'); 
+
+    res.status(200).json(applications);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
