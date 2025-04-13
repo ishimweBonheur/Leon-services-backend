@@ -173,6 +173,7 @@ router.put('/:jobId', authenticate, authorizeRoles('admin'), jobController.updat
  *         description: Job not found
  *       401:
  *         description: Unauthorized
+ * 
  */
 router.delete('/:jobId', authenticate, authorizeRoles('admin'), jobController.deleteJob);
 router.get('/', jobController.getJobs);
