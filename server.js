@@ -6,6 +6,7 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
 const jobRoutes = require('./routes/job'); 
 const jobApplicationRoutes = require('./routes/jobApplication'); 
+const emailRoutes= require('./routes/email'); 
 const { swaggerUi, specs } = require("./swagger");
 
 dotenv.config();
@@ -31,7 +32,8 @@ mongoose.connect(process.env.MONGO_URI, {
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use('/api/jobs', jobRoutes); // Job posting routes
-app.use('/api/applications', jobApplicationRoutes); // Job application routes
+app.use('/api/applications', jobApplicationRoutes); 
+app.use('/api/email', emailRoutes); 
 
 // ✅ Swagger Setup (API Documentation)
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs)); // Swagger UI
