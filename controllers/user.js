@@ -1,16 +1,16 @@
 const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
-
 const userService = require('../services/user');
 
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+// Register user
 const registerUser = async (req, res) => {
   try {
     const { firstName, lastName, username, email, phone, password, role } = req.body;
 
-    // Check if the user already exists by email, username, or phone
-    const existingUser = await User.findOne({ 
-      $or: [{ email }, { username }, { phone }] 
-    });
+    const existingUser = await User.findOne({ $or: [{ email }, { username }, { phone }] });
 
     if (existingUser) {
       let conflictField;
@@ -18,31 +18,25 @@ const registerUser = async (req, res) => {
       else if (existingUser.username === username) conflictField = "username";
       else if (existingUser.phone === phone) conflictField = "phone";
 
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: `A user with this ${conflictField} already exists. Please use a different ${conflictField}.`
       });
     }
 
-    // Create new user
     const user = await new User({ firstName, lastName, username, email, phone, password, role }).save();
-
-    // Generate JWT token
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
     res.status(201).json({ user, token });
   } catch (error) {
     if (error.code === 11000) {
-      // Handle MongoDB duplicate key error
       const duplicateField = Object.keys(error.keyValue)[0];
       res.status(400).json({
         error: `A user with this ${duplicateField} already exists: ${error.keyValue[duplicateField]}. Please use a different ${duplicateField}.`
       });
     } else if (error.name === "ValidationError") {
-      // Handle Mongoose validation errors
       const validationErrors = Object.values(error.errors).map(err => err.message);
       res.status(400).json({ error: `Validation failed: ${validationErrors.join(", ")}` });
     } else {
-      // Handle generic server errors
       res.status(500).json({ error: `Server error: ${error.message}` });
     }
   }
@@ -53,7 +47,7 @@ const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
-    
+
     if (!user || !(await user.comparePassword(password))) {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
@@ -62,6 +56,98 @@ const loginUser = async (req, res) => {
     res.status(200).json({ user, token });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+};
+
+// In your auth controller
+const googleAuth = async (req, res) => {
+  try {
+    const { tokenId } = req.body;
+
+    if (!tokenId) {
+      return res.status(400).json({
+        error: 'Token ID is required',
+      });
+    }
+
+    // Verify the Google token
+    const ticket = await client.verifyIdToken({
+      idToken: tokenId,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload) {
+      return res.status(401).json({
+        error: 'Invalid token payload',
+      });
+    }
+
+    const { email, name, picture, email_verified } = payload;
+
+    if (!email || !email_verified) {
+      return res.status(400).json({
+        error: 'Verified email is required',
+      });
+    }
+
+    // Extract name parts
+    const nameParts = name ? name.split(' ') : [''];
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+
+    // Check if user exists
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      // Register the user
+      const username = email.split('@')[0];
+      const usernameExists = await User.findOne({ username });
+      const finalUsername = usernameExists
+        ? `${username}${Date.now().toString().slice(-4)}`
+        : username;
+
+      user = new User({
+        email,
+        firstName,
+        lastName,
+        username: finalUsername,
+        profilePicture: picture,
+        isVerified: true,
+        authMethod: 'google',
+      });
+      await user.save();
+    } else if (user.authMethod !== 'google') {
+      // Update existing user's auth method if they previously used email/password
+      user.authMethod = user.authMethod ? 'multiple' : 'google';
+      await user.save();
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.status(200).json({
+      message: user.isNew ? 'User registered successfully' : 'User logged in successfully',
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        profilePicture: user.profilePicture,
+      },
+    });
+  } catch (error) {
+    console.error('Google auth error:', error);
+    res.status(500).json({
+      error: 'Google authentication failed',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
   }
 };
 
@@ -93,7 +179,6 @@ const updateUser = async (req, res) => {
     res.status(200).json(user);
   } catch (error) {
     if (error.code === 11000) {
-      // Handle duplicate key error
       const duplicateField = Object.keys(error.keyValue)[0];
       return res.status(400).json({
         error: `A user with this ${duplicateField} already exists: ${error.keyValue[duplicateField]}. Please use a different ${duplicateField}.`
@@ -101,24 +186,19 @@ const updateUser = async (req, res) => {
     }
 
     if (error.name === "ValidationError") {
-    
       const validationErrors = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({ error: `Validation failed: ${validationErrors.join(", ")}` });
     }
 
     if (error.name === "CastError" && error.kind === "ObjectId") {
-      
       return res.status(400).json({ error: "Invalid user ID format." });
     }
 
-    
     res.status(500).json({ error: `Server error: ${error.message}` });
   }
 };
 
-
-
-// this is the controller  to deactivate the user 
+// Deactivate user
 const deleteUser = async (req, res) => {
   try {
     const updatedUser = await userService.deleteUser(req.params.id);
@@ -128,11 +208,9 @@ const deleteUser = async (req, res) => {
   }
 };
 
-
 const getAllUsers = async (req, res) => {
   try {
     const activeUsers = res.pagination.list.filter(user => user.is_active);
-
     res.status(200).json({
       ...res.pagination,
       list: activeUsers,
@@ -143,20 +221,28 @@ const getAllUsers = async (req, res) => {
   }
 };
 
-
- const activeUser = async (req,res) =>{
-    try {
-      const user = await userService.disableUser(req.params.id);
-      const message = user.is_active === true ? "User activated successfully" : " User disactivated successfully"
-      res.json({message,user});
-    } catch (error) {
-      if (error.message === 'User not found') {
-        return res.status(404).json({ error: 'User not found' });
-      } else {
-        return res.status(500).json({ error: 'Failed to disable User' });
-      }
+const activeUser = async (req, res) => {
+  try {
+    const user = await userService.disableUser(req.params.id);
+    const message = user.is_active === true ? "User activated successfully" : "User deactivated successfully";
+    res.json({ message, user });
+  } catch (error) {
+    if (error.message === 'User not found') {
+      return res.status(404).json({ error: 'User not found' });
+    } else {
+      return res.status(500).json({ error: 'Failed to disable User' });
     }
   }
-module.exports = { createUser, updateUser, deleteUser,getAllUsers,activeUser ,registerUser, loginUser,checkUser,loginUser };
+};
 
-
+module.exports = {
+  createUser,
+  updateUser,
+  deleteUser,
+  getAllUsers,
+  activeUser,
+  registerUser,
+  loginUser,
+  checkUser,
+  googleAuth, 
+};

@@ -127,4 +127,18 @@ router.post('/login', authController.loginUser);
  */
 router.get('/check-user', authenticate, authController.checkUser);
 
+/**
+ * @swagger
+ * /api/auth/google:
+ *   post:
+ *     summary: Authenticate user with Google
+ *     tags: [Authentication]
+ *     responses:
+ *       200:
+ *         description: User authenticated successfully
+ *       400:
+ *         description: Invalid request data
+ */
+router.post('/google', authController.googleAuth);
+
 module.exports = router;
