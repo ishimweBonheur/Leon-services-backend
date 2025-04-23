@@ -68,24 +68,22 @@ const googleAuth = async (req, res) => {
       return res.status(400).json({ error: 'Google token is required' });
     }
 
-    // Log the token for debugging purposes (remove in production)
-    console.log('Received Google token:', tokenId);
-
     const ticket = await client.verifyIdToken({
       idToken: tokenId,
-      audience: process.env.GOOGLE_CLIENT_ID,  // Your Google client ID
+      audience: process.env.GOOGLE_CLIENT_ID,
     });
 
+    if (!ticket) {
+      return res.status(401).json({ error: 'Token verification failed' });
+    }
+
     const payload = ticket.getPayload();
-
-    // Log the payload for debugging purposes
-    console.log('Google Token Payload:', payload);
-
     if (!payload) {
       return res.status(401).json({ error: 'Invalid Google token payload' });
     }
 
     const { email, name, picture, email_verified } = payload;
+    console.log('Email Verified:', email_verified);
 
     if (!email || !email_verified) {
       return res.status(400).json({ error: 'Verified email is required from Google account' });
@@ -112,17 +110,29 @@ const googleAuth = async (req, res) => {
         profilePicture: picture,
         isVerified: true,
         authMethod: 'google',
+        password: Math.random().toString(36).slice(-8), 
+        role: 'user', 
       });
 
-      await user.save();
+      try {
+        await user.save();
+      } catch (err) {
+        console.error('User save failed:', err);
+        return res.status(400).json({
+          error: 'Failed to create new user from Google authentication',
+          details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+        });
+      }
     } else if (user.authMethod !== 'google') {
       user.authMethod = user.authMethod === 'password' ? 'multiple' : 'google';
       await user.save();
     }
 
-    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
-      expiresIn: '7d',
-    });
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
 
     res.status(200).json({
       message: 'User authenticated successfully with Google',
@@ -139,8 +149,6 @@ const googleAuth = async (req, res) => {
     });
   } catch (error) {
     console.error('Google auth error:', error);
-
-    // Detailed error logging for debugging
     if (error.response) {
       console.error('Google API Response Error:', error.response);
     }
@@ -151,6 +159,7 @@ const googleAuth = async (req, res) => {
     });
   }
 };
+
 
 
 const checkUser = async (req, res) => {
