@@ -68,12 +68,19 @@ const googleAuth = async (req, res) => {
       return res.status(400).json({ error: 'Google token is required' });
     }
 
+    // Log the token for debugging purposes (remove in production)
+    console.log('Received Google token:', tokenId);
+
     const ticket = await client.verifyIdToken({
       idToken: tokenId,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: process.env.GOOGLE_CLIENT_ID,  // Your Google client ID
     });
 
     const payload = ticket.getPayload();
+
+    // Log the payload for debugging purposes
+    console.log('Google Token Payload:', payload);
+
     if (!payload) {
       return res.status(401).json({ error: 'Invalid Google token payload' });
     }
@@ -132,12 +139,19 @@ const googleAuth = async (req, res) => {
     });
   } catch (error) {
     console.error('Google auth error:', error);
+
+    // Detailed error logging for debugging
+    if (error.response) {
+      console.error('Google API Response Error:', error.response);
+    }
+
     res.status(500).json({
       error: 'Google authentication failed',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
+
 
 const checkUser = async (req, res) => {
   try {
