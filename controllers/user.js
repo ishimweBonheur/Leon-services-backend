@@ -59,18 +59,15 @@ const loginUser = async (req, res) => {
   }
 };
 
-// In your auth controller
+// Google Authentication
 const googleAuth = async (req, res) => {
   try {
-    const { tokenId } = req.body;
+    const tokenId = req.body.tokenId || req.body.id_token;
 
     if (!tokenId) {
-      return res.status(400).json({
-        error: 'Token ID is required',
-      });
+      return res.status(400).json({ error: 'Google token is required' });
     }
 
-    // Verify the Google token
     const ticket = await client.verifyIdToken({
       idToken: tokenId,
       audience: process.env.GOOGLE_CLIENT_ID,
@@ -78,34 +75,27 @@ const googleAuth = async (req, res) => {
 
     const payload = ticket.getPayload();
     if (!payload) {
-      return res.status(401).json({
-        error: 'Invalid token payload',
-      });
+      return res.status(401).json({ error: 'Invalid Google token payload' });
     }
 
     const { email, name, picture, email_verified } = payload;
 
     if (!email || !email_verified) {
-      return res.status(400).json({
-        error: 'Verified email is required',
-      });
+      return res.status(400).json({ error: 'Verified email is required from Google account' });
     }
 
-    // Extract name parts
     const nameParts = name ? name.split(' ') : [''];
     const firstName = nameParts[0] || '';
     const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
 
-    // Check if user exists
     let user = await User.findOne({ email });
 
     if (!user) {
-      // Register the user
-      const username = email.split('@')[0];
-      const usernameExists = await User.findOne({ username });
+      const usernameBase = email.split('@')[0];
+      const usernameExists = await User.findOne({ username: usernameBase });
       const finalUsername = usernameExists
-        ? `${username}${Date.now().toString().slice(-4)}`
-        : username;
+        ? `${usernameBase}${Date.now().toString().slice(-4)}`
+        : usernameBase;
 
       user = new User({
         email,
@@ -116,28 +106,26 @@ const googleAuth = async (req, res) => {
         isVerified: true,
         authMethod: 'google',
       });
+
       await user.save();
     } else if (user.authMethod !== 'google') {
-      // Update existing user's auth method if they previously used email/password
-      user.authMethod = user.authMethod ? 'multiple' : 'google';
+      user.authMethod = user.authMethod === 'password' ? 'multiple' : 'google';
       await user.save();
     }
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
+      expiresIn: '7d',
+    });
 
     res.status(200).json({
-      message: user.isNew ? 'User registered successfully' : 'User logged in successfully',
+      message: 'User authenticated successfully with Google',
       token,
       user: {
         id: user._id,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
+        username: user.username,
         role: user.role,
         profilePicture: user.profilePicture,
       },
@@ -198,7 +186,6 @@ const updateUser = async (req, res) => {
   }
 };
 
-// Deactivate user
 const deleteUser = async (req, res) => {
   try {
     const updatedUser = await userService.deleteUser(req.params.id);
@@ -224,7 +211,7 @@ const getAllUsers = async (req, res) => {
 const activeUser = async (req, res) => {
   try {
     const user = await userService.disableUser(req.params.id);
-    const message = user.is_active === true ? "User activated successfully" : "User deactivated successfully";
+    const message = user.is_active ? "User activated successfully" : "User deactivated successfully";
     res.json({ message, user });
   } catch (error) {
     if (error.message === 'User not found') {
@@ -244,5 +231,5 @@ module.exports = {
   registerUser,
   loginUser,
   checkUser,
-  googleAuth, 
+  googleAuth,
 };
