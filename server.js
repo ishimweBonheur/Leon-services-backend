@@ -8,20 +8,19 @@ const jobRoutes = require('./routes/job');
 const jobApplicationRoutes = require('./routes/jobApplication'); 
 const emailRoutes= require('./routes/email');
 const contactsRoutes = require('./routes/contacts') 
+const subscriptionsRoutes=require('./routes/subscription')
 const { swaggerUi, specs } = require("./swagger");
 
 dotenv.config();
 const app = express();
 
-// ✅ Middleware
 app.use(cors({
   origin:'*',
-  credentials: true, // Allow cookies to be sent across domains (if needed)
+  credentials: true, 
 }));
 
-app.use(express.json()); // ✅ Parse incoming JSON requests
+app.use(express.json()); 
 
-// ✅ MongoDB Connection
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
@@ -29,18 +28,16 @@ mongoose.connect(process.env.MONGO_URI, {
   .then(() => console.log("Connected to MongoDB"))
   .catch((err) => console.log("Failed to connect to MongoDB:", err));
 
-// ✅ Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use('/api/jobs', jobRoutes); 
 app.use('/api/applications', jobApplicationRoutes); 
 app.use('/api/email', emailRoutes); 
 app.use('/api/contacts', contactsRoutes);
+app.use('/api/subscriptions', subscriptionsRoutes)
 
-// ✅ Swagger Setup (API Documentation)
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs)); // Swagger UI
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs)); 
 
-// ✅ Global Error Handling Middleware (Optional but recommended for catching errors)
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ msg: "Internal server error" });
